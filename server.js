@@ -814,7 +814,7 @@ async function start() {
   const schema=fs.readFileSync(path.join(__dirname,'schema.sql'),'utf8');
   await pool.query(schema);
   const port=Number(process.env.PORT)||3000;
-  return app.listen(port,'0.0.0.0',()=>console.log(`TravelleR is ready at http://localhost:${port}`));
+  return app.listen(port,'0.0.0.0',()=>console.log(`TravelleR is ready at port:${port}`));
 }
 if(require.main===module)start().catch(err=>{console.error(err.message);process.exitCode=1});
 module.exports={app,pool,start,normalizeEmail,validateTrip,googleAuth};
