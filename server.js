@@ -12,7 +12,7 @@ const app = express();
 if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use((req, res, next) => {
-  res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY' });
+  res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY','Cross-Origin-Opener-Policy': 'same-origin-allow-popups', });
   next();
 });
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_URL && /supabase|render|neon|railway/i.test(process.env.DATABASE_URL) ? { rejectUnauthorized: false } : undefined });
@@ -71,12 +71,51 @@ app.use('/auth', (req, res, next) => {
 app.use((req, res, next) => {
   if (!['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method)) return next();
   if (!req.is('application/json')) return error(res, 415, 'Content-Type must be application/json.');
-  const origin = req.get('origin');
-  if (origin) {
-    let originHost;
-    try { originHost = new URL(origin).host; } catch { return error(res, 403, 'Origin is not allowed.'); }
-    if (originHost !== req.get('host')) return error(res, 403, 'Origin is not allowed.');
+  
+const allowedOrigins = new Set(
+  String(process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(value => {
+      try {
+        return new URL(value.trim()).origin;
+      } catch {
+        return '';
+      }
+    })
+    .filter(Boolean)
+);
+
+app.use((req, res, next) => {
+  if (!['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method)) {
+    return next();
   }
+
+  if (!req.is('application/json')) {
+    return error(res, 415, 'Content-Type must be application/json.');
+  }
+
+  const origin = req.get('origin');
+
+  if (origin) {
+    let normalizedOrigin;
+
+    try {
+      normalizedOrigin = new URL(origin).origin;
+    } catch {
+      return error(res, 403, 'Origin is not allowed.');
+    }
+
+    if (
+      allowedOrigins.size === 0 ||
+      !allowedOrigins.has(normalizedOrigin)
+    ) {
+      return error(res, 403, 'Origin is not allowed.');
+    }
+  }
+
+  next();
+});
+
   next();
 });
 app.use(express.json({ limit: '20kb', strict: true }));
